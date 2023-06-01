@@ -9,10 +9,8 @@ items = [Item("Chemise", ["chemise"], (20, 30))]
 
 
 def main():
-    start = time.time()
     for item in items:
         ads = scrap(item, (0, 1))
-        print(f"Scraped in {time.time() - start}s")
         for ad in ads:
             if not db.exists(ad):
                 response = discord.post(ad)
@@ -24,7 +22,7 @@ def main():
                 print("already exists")
 
 
-# while True:
-#     main()
-#     time.sleep(random.randint(60, 120))
-main()
+while True:
+    main()
+    time.sleep(random.randint(60, 120))
+# main()
