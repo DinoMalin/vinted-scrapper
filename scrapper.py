@@ -18,8 +18,9 @@ class Account():
         self.id = None
         self.username = None
         self.profile_picture = []
-        self.rating_score = None
-        self.rating_count = None
+
+    def __str__(self) -> str:
+        return f'Account(id={self.id}, username={self.username}, profile_picture={self.profile_picture})'
 
 
 class Ad():
@@ -31,45 +32,36 @@ class Ad():
         self.images = []
         self.account = Account()
 
-
-def getAccount(link, browser):
-
-    page = browser.new_page()
-    stealth_sync(page)
-    page.goto(link)
-    soup = BeautifulSoup(page.content(), 'html.parser')
-    account = Account()
-    account.profile_picture = soup.find(
-        'div', {'class': 'u-flexbox'}).find('img').get('src')
-    json = soup.find('script', {'id': 'js-react-on-rails-context'})
-    #account.id = json['pathname'].split('/member/')[0]
-    # print(account.id)
-    page.close()
-    return account
+    def __str__(self) -> str:
+        return f'Ad(id={self.id}, title={self.title}, url={self.url}, price={self.price}, images={self.images}, account={self.account})'
 
 
-def getAd(ad, browser):
+def getAd(ad):
     result = Ad()
     result.id = ad.find(
-        'div', {'class': 'web_ui__ItemBox__box'}).get('data-testid')
-    split = result.id.split('product-item-id-')
-    if (len(split) > 1):
-        result.id = split[1]  # ID
+        'div', {'class': 'web_ui__ItemBox__box'}).get('data-testid').split('--overlay-link')[0].split('-')[-1]
+    result.url = ad.find(
+        'a', {'class': 'web_ui__ItemBox__overlay'}).get('href')  # URL
+    result.price = ad.find('h3').text[:-2]  # Price
+    image = ad.find("div", {"class": "web_ui__ItemBox__image"}).find('img')
+    result.title = image.get('alt')  # Title
+    result.images = [image.get('src')]  # Images
+
+    account = Account()
+    divAccount = ad.find(
+        'a', {'class': 'web_ui__Cell__cell web_ui__Cell__narrow web_ui__Cell__link'})
+    if (divAccount == None):
+        divAccount = ad.find(
+            'div', {'class': 'web_ui__Cell__image'})
+        urlSplit = divAccount.find('a').get(
+            'href').split('/member/')[1].split('-')
     else:
-        result.id = result.id.split('item-')[1]
-    print(result.id)
-    thumbnail = ad.find(
-        'a', {'class': 'web_ui__ItemBox__overlay'})
-    result.url = thumbnail.get('href')  # URL
-    split = thumbnail.get('title')
-    result.title = split.split(', prix\xa0: ')[0]  # Title
-    result.price = split.split(', prix\xa0: ')[1].split('\xa0€')[0]  # Price
-    result.images = ad.find(
-        'img', {'class': 'web_ui__Image__content'}).get('src')  # Images
+        urlSplit = divAccount.get('href').split('/member/')[1].split('-')
 
-    account = getAccount(ad.find(
-        'a', {'class': 'web_ui__Cell__cell web_ui__Cell__narrow web_ui__Cell__link'}).get('href'), browser)
-
+    account.id = urlSplit[0]
+    account.username = urlSplit[1]
+    account.profile_picture = divAccount.find('img').get('src')
+    result.account = account
     return result
 
 
@@ -77,7 +69,7 @@ def scrap(item: Item, delay_range: tuple) -> list[Ad]:
     ads = []
     for keyword in item.keywords:
         with playwright.sync_api.sync_playwright() as sp:
-            browser = sp.firefox.launch(headless=False, slow_mo=70)
+            browser = sp.firefox.launch(headless=True)
             page = browser.new_page()
             stealth_sync(page)
             page.goto(
@@ -86,7 +78,7 @@ def scrap(item: Item, delay_range: tuple) -> list[Ad]:
             soup = BeautifulSoup(page.content(), 'html.parser').find_all(
                 'div', {'data-testid': 'grid-item'})
             for ad in soup:
-                ads.append(getAd(ad, browser))
+                ads.append(getAd(ad))
             browser.close()
         time.sleep(random.randint(delay_range[0], delay_range[1]))
     return ads
